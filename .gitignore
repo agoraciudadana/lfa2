@@ -1,5 +1,7 @@
 *.class
 *.log
+*.png
+*.csv
 
 # sbt specific
 dist/*

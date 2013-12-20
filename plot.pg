@@ -1,0 +1,6 @@
+#!/usr/bin/gnuplot
+reset
+set terminal png
+set datafile separator ","
+set title "random liquid filtering"
+plot "ratio-score.csv" using 1:2 title "unoptimized", "" using 1:3 title "optimized"
