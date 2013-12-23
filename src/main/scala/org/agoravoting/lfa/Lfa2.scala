@@ -23,23 +23,55 @@ import scala.util.Random
 
 class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) extends Pause {
     // calculate the transitive closure
-    val tc = graph.clone().asInstanceOf[SimpleDirectedGraph[Object, DefaultEdge]]
-    TransitiveClosure.INSTANCE.closeSimpleDirectedGraph(tc)
+    
+    // val tc = graph.clone().asInstanceOf[SimpleDirectedGraph[Object, DefaultEdge]]    
+    // println("calculating transitive closure..")
+    // TransitiveClosure.INSTANCE.closeSimpleDirectedGraph(tc)    
     
     // calculate the distance matrix
+    print("calculating shortest paths (floyd-warshall)..")
     val fd = new FloydWarshallShortestPaths[Object, DefaultEdge](graph)
+    println("ok")
     
     val vmap = graph.vertexSet.zipWithIndex.toMap  
     val vmapReverse = graph.vertexSet.zipWithIndex.map(_.swap).toMap                        
     
+    print("calculating source map..")
+    // calculate the source map
+    val distances = for {
+        v1 <- graph.vertexSet.toList
+        v2 <- graph.vertexSet.toList
+    } yield( (v2, v1, fd.shortestDistance(v1, v2) ))
+    
+    val incomingMap = distances.filter(t => !t._3.isInfinite && (t._1 != t._2) ).groupBy(_._1).map( x => vmap(x._1) -> x._2.map( y => (vmap(y._2) -> y._3) ) ).toMap
+    println("ok")
+    
+    /* val firstVertex = graph.vertexSet.toIndexedSeq(0)
+    println("node is " + vmap(firstVertex))
+    val incoming = fd.getShortestPaths(firstVertex).map( x => vmap(x.getEndVertex) ).sortWith(_ < _)
+    println("*** " + incoming);     
+    val incoming2 = tc.incomingEdgesOf(firstVertex).map( x => vmap(tc.getEdgeSource(x))).toList.sortWith(_ < _)
+    println(" *** " + incoming2); 
+    println(" *** " + incomingMap.getOrElse(vmap(firstVertex), Nil))
+    
+    */
+    
+    
+    // println( sources.toList.map( x=> fd.shortestDistance(x._1, x._2) ))           
+    
+    
     def randomState(questionsPerVertex: Int = 1) = {
+        var assigned = Map[(Object, Int), Boolean]()
         val assignments = Array.fill(questions)(Set[Int]()).toIndexedSeq
         val tAssignments = Array.fill(questions)(SortedMap[Int, SortedMap[Double, Int]]()).toIndexedSeq
         
-        var state = State(assignments, tAssignments, vmap)        
+        var state = State(assignments, tAssignments)        
         for(i <- 1 to questionsPerVertex) {            
             vmap.keys.foreach { v =>
-                state = state.assign(v, Random.nextInt(assignments.length))
+                var random = Random.nextInt(assignments.length)
+                while(assigned.contains((v, random))) random = Random.nextInt(assignments.length)
+                assigned = assigned + ((v, random) -> true)
+                state = state.assign(v, random)
             }
         }
         
@@ -140,17 +172,7 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
         val randomVertex = Random.nextInt(vertices.length)
         val vertex = vertices(randomVertex)
         val vertexObject = vmapReverse(vertex)
-                               
-        /* println("\n****************")
-        println(vertexIndex + " " + source + " -> " + target)
-        state.print            
-        val u = state.unassign(vertex, source)
-        u.print
-        val a = u.assign(vertex, target)
-        a.print
-        println("****************")
-        a
-        */        
+                                       
         // move vertex from source to target
         state.unassign(vertexObject, source).assign(vertexObject, target)
     }
@@ -182,11 +204,13 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
         else 1 / (distance + 1)
     }
     
-    val maxScore = (questions * getDistanceScore(0)) + ((graph.vertexSet.size - 1) * getDistanceScore(1.0) * questions)    
-    val maxScoreRaw = questions * graph.vertexSet.size
+    def maxScore(questionsPerVertex: Int) = {
+        (questionsPerVertex * graph.vertexSet.size * getDistanceScore(0)) + ((questions - questionsPerVertex) * graph.vertexSet.size * getDistanceScore(1.0))
+    }
+    val maxScoreRaw = questions * graph.vertexSet.size    
     
     // a node of the search tree
-    case class State(assignments: IndexedSeq[Set[Int]], tAssignments: IndexedSeq[SortedMap[Int,SortedMap[Double, Int]]], vertices: Map[Object, Int], debug: String = "") {                        
+    case class State(assignments: IndexedSeq[Set[Int]], tAssignments: IndexedSeq[SortedMap[Int,SortedMap[Double, Int]]], debug: String = "") {                        
         
         // create a new state by assigning a vertex to a question
         def assign(vertex: Object, question: Int) = {
@@ -194,7 +218,8 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
             
             val a = assignments(question) + index
                     
-            val incoming = tc.incomingEdgesOf(vertex)        
+/*
+                    val incoming = tc.incomingEdgesOf(vertex)        
             
             // val updates = incoming.map(x => (vmap(tc.getEdgeSource(x)), 1.0)).toList
             val updates = incoming.map{x => 
@@ -202,12 +227,16 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
                 val distance = fd.shortestDistance(source, vertex)                
                 (vmap(tc.getEdgeSource(x)), getDistanceScore(distance))
             }.filter(u => (u._2 != 0) && (u._1 != index)).toList
-            
-// println(index + " added to " + question + " " + updates)
-// println("*** " + tAssignments(question))
+  */          
+            val incoming = incomingMap.getOrElse(index, Nil)
+            val updates = incoming.map{ x => 
+                (x._1, getDistanceScore(x._2))
+            }.filter(u => (u._2 != 0) && (u._1 != index)).toList                       
+
+
             val t = addValues((index, 1.0) :: updates, tAssignments(question))
-// pause(t)
-            State(assignments.updated(question, a), tAssignments.updated(question, t), vertices - vertex, index + " -> " + question)
+
+            State(assignments.updated(question, a), tAssignments.updated(question, t), index + " -> " + question)
         }
         
         // create a new state by unassigning a vertex to a question
@@ -218,28 +247,25 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
             
             val a = assignments(question) - index
             
-            val incoming = tc.incomingEdgesOf(vertex)
+/*            val incoming = tc.incomingEdgesOf(vertex)
             
             // val updates = incoming.map(x => (vmap(tc.getEdgeSource(x)), 1.0)).toList
+
             val updates = incoming.map{x => 
                 val source = tc.getEdgeSource(x)
                 val distance = fd.shortestDistance(source, vertex)
                 (vmap(tc.getEdgeSource(x)), getDistanceScore(distance))
             }.filter(u => (u._2 != 0) && (u._1 != index)).toList                       
-                 
-// println(index + " removed from " + question + " " + updates)
-// println(tAssignments(question))
+  */               
+            val incoming = incomingMap.getOrElse(index, Nil)
+            val updates = incoming.map{ x => 
+                (x._1, getDistanceScore(x._2))
+            }.filter(u => (u._2 != 0) && (u._1 != index)).toList                       
+
             val t = removeValues((index, 1.0) :: updates, tAssignments(question))
-// pause(t)
-            State(assignments.updated(question, a), tAssignments.updated(question, t), vertices - vertex, index + " <- " + question)
-        }
-        
-        def sourcesForQuestion(question: Int) = {
-            val vertices = assignments(question).toList            
-            val vObjects = vertices.map(vmapReverse(_))            
-            val sources = vObjects.map(vertex => (vmap(vertex), tc.incomingEdgesOf(vertex).map(edge => vmap(tc.getEdgeSource(edge)))))
-            sources
-        }
+
+            State(assignments.updated(question, a), tAssignments.updated(question, t), index + " <- " + question)
+        }               
         
         // update the t assignment map structure with current values (preserves memory of previous values)        
         private def addValues(values: List[(Int, Double)], map: SortedMap[Int,SortedMap[Double, Int]]): SortedMap[Int,SortedMap[Double, Int]] = values match {
@@ -285,10 +311,20 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
             }
             case Nil => map
         }      
-        // gets assignments in the form (vertex -> question)
+        // gets assignments in the form (vertex -> (question1, question2, question3..))
         def getAssignments = {
-            assignments.zipWithIndex.map(_.swap).flatMap( x => x._2.map(_ -> x._1)).groupBy(_._1).toMap
+            val tuples = assignments.zipWithIndex.map(_.swap).flatMap( x => x._2.map(_ -> x._1) )
+            // grouped by vertex
+            tuples.groupBy(_._1).map(x => x._1 -> x._2.map(_._2))
         }
+        // gets the vertices that are assigned to a question, transitively
+        def sourcesForQuestion(question: Int) = {
+            val vertices = assignments(question).toList            
+            val vObjects = vertices.map(vmapReverse(_))            
+            val sources = vObjects.map(vertex => (vmap(vertex), incomingMap(vmap(vertex))))
+            sources
+        }
+        
         def print = {
             println("* assignments " + assignments.zipWithIndex.map(_.swap) + " (score = " +  score(this) + ")")
             // println("* assignments " + getAssignments + " (score = " +  score(this) + ")")
@@ -296,8 +332,7 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
             println("* tassignments ")
             tAssignments.zipWithIndex.foreach { x =>
                 println(x._2 + ": " + x._1)
-            }
-            // println("* tassignments " + tAssignments)
+            }            
         }
     }       
 }

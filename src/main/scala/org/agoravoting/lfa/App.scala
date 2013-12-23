@@ -19,20 +19,26 @@ import scala.collection.mutable.ArrayBuffer
 import scala.annotation.tailrec
 
 object App extends Application {           
-    val edgeVertexRatio = 3
-    val vertices = 100
+    val edgeVertexRatio = 1
+    val vertices = 400
     val questions = 30
     
-    ratioTrend(1.0, 10.0, vertices, questions)    
     
-    /* 
+    // ratioTrend3(1.0, 10.0, vertices, questions, 5)    
+    
+    
     val graph = getRandomGraph(vertices, edgeVertexRatio)            
     val lfa = new Lfa2(questions, graph)                       
     val begin = lfa.randomState(4)
-    begin.print
-    println("\n\n\n")
-    val end1 = lfa.search(begin, 3000, 1)
-    val end2 = lfa.searchSA(begin, 3000, 1)
+    // begin.print
+    
+    println("running optimizer..")
+    val end1 = lfa.search(begin, 8000, 1)
+    println("done")
+    
+    println(lfa.score(end1) + " " + lfa.score(begin) + "(" + lfa.maxScore(4) + ") " + " " + lfa.scoreRaw(end1) + " " + lfa.scoreRaw(begin) +  " (" + lfa.maxScoreRaw +  ")")
+    // print(end1.getAssignments)
+    /* val end2 = lfa.searchSA(begin, 3000, 1)
     // val end2 = lfa.search(begin, 5000, 10, true)
     // val end2 = lfa.searchSA(begin, 5000, 20)
     
@@ -55,10 +61,29 @@ object App extends Application {
         val values = ratios.map{ r =>             
             val graph = getRandomGraph(vertices, r)
             val lfa = new Lfa2(questions, graph)
-            println(lfa.maxScore)
+            println(lfa.maxScore(5))
             val state = lfa.randomState(5)
             val end = lfa.search(state, 3000, 1)
             List(r, lfa.score(state), lfa.score(end))
+        }
+        
+        exportList(values, "ratio-score")
+    }
+    
+    def ratioTrend3(ratioMin: Double, ratioMax: Double, vertices: Int, questions: Int, maxQuestions: Int, inc: Double = 0.5) = {
+        val ratios = for {
+            r <- ratioMin until (ratioMax, inc) 
+            q <- 1 until maxQuestions
+        } yield(r, q)
+        
+        val values = ratios.map{ rq =>             
+            println("running with r = " + rq._1 + " q = " + rq._2)
+            val graph = getRandomGraph(vertices, rq._1)
+            val lfa = new Lfa2(questions, graph)
+            println(lfa.maxScore(rq._2))
+            val state = lfa.randomState(rq._2)
+            val end = lfa.search(state, 3000, 1)
+            List(rq._1, rq._2, lfa.score(state), lfa.score(end))
         }
         
         exportList(values, "ratio-score")
@@ -91,7 +116,7 @@ object App extends Application {
         val pw = new java.io.PrintWriter(fileName + ".csv" , "UTF-8")
         // pw.write("id," + fileName + "\n")
         if(header.length > 0) pw.write(header + "\n")
-        lines.foreach( lines => pw.write(lines.mkString(",") + "\n"))
+        lines.foreach( line => pw.write(line.mkString(",") + "\n"))
         pw.close
     }
 }
