@@ -39,11 +39,12 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
     print("calculating source map..")
     // calculate the source map
     val distances = for {
-        v1 <- graph.vertexSet.toList
+        v1 <- graph.vertexSet.toList.par
         v2 <- graph.vertexSet.toList
     } yield( (v2, v1, fd.shortestDistance(v1, v2) ))
+    print("collecting..")
     
-    val incomingMap = distances.filter(t => !t._3.isInfinite && (t._1 != t._2) ).groupBy(_._1).map( x => vmap(x._1) -> x._2.map( y => (vmap(y._2) -> y._3) ) ).toMap
+    val incomingMap = distances.filter(t => !t._3.isInfinite && (t._1 != t._2) && t._3 < 4).view.groupBy(_._1).map( x => vmap(x._1) -> x._2.map( y => (vmap(y._2) -> y._3) ) ).toMap
     println("ok")
     
     /* val firstVertex = graph.vertexSet.toIndexedSeq(0)
@@ -192,10 +193,12 @@ class Lfa2(val questions: Int, graph: SimpleDirectedGraph[Object, DefaultEdge]) 
     }
     // question score, ignore branch lengths
     def scoreQuestionRaw(question: SortedMap[Int,SortedMap[Double, Int]]) = {
-        if(question.isEmpty) 0
+        if(question.isEmpty) {            
+            0.0
+        }
         else question.values.map{ lengths =>
             if(lengths.isEmpty) 0
-            else 1
+            else 1.0
         }.reduce(_ + _)
     }
     // score based on delegation path length

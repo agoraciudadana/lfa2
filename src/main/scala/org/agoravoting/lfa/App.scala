@@ -20,24 +20,25 @@ import scala.annotation.tailrec
 
 object App extends Application {           
     val edgeVertexRatio = 1
-    val vertices = 400
-    val questions = 30
+    val vertices = 500
+    val questions = 50
     
     
-    // ratioTrend3(1.0, 10.0, vertices, questions, 5)    
+    ratioTrend3(1.0, 10, vertices, questions, 6)    
     
     
-    val graph = getRandomGraph(vertices, edgeVertexRatio)            
+/*    val graph = getRandomGraph(vertices, edgeVertexRatio)            
     val lfa = new Lfa2(questions, graph)                       
-    val begin = lfa.randomState(4)
-    // begin.print
+    val begin = lfa.randomState(4)    
     
     println("running optimizer..")
     val end1 = lfa.search(begin, 8000, 1)
     println("done")
     
     println(lfa.score(end1) + " " + lfa.score(begin) + "(" + lfa.maxScore(4) + ") " + " " + lfa.scoreRaw(end1) + " " + lfa.scoreRaw(begin) +  " (" + lfa.maxScoreRaw +  ")")
-    // print(end1.getAssignments)
+*/  
+
+  // print(end1.getAssignments)
     /* val end2 = lfa.searchSA(begin, 3000, 1)
     // val end2 = lfa.search(begin, 5000, 10, true)
     // val end2 = lfa.searchSA(begin, 5000, 20)
@@ -74,7 +75,7 @@ object App extends Application {
         val ratios = for {
             r <- ratioMin until (ratioMax, inc) 
             q <- 1 until maxQuestions
-        } yield(r, q)
+        } yield(r, q)        
         
         val values = ratios.map{ rq =>             
             println("running with r = " + rq._1 + " q = " + rq._2)
@@ -82,8 +83,9 @@ object App extends Application {
             val lfa = new Lfa2(questions, graph)
             println(lfa.maxScore(rq._2))
             val state = lfa.randomState(rq._2)
-            val end = lfa.search(state, 3000, 1)
-            List(rq._1, rq._2, lfa.score(state), lfa.score(end))
+            val end = lfa.search(state, 5000, 1)
+            println("\n" + rq._1 + " " + rq._2  + " " + (lfa.score(state)/lfa.maxScore(rq._2))  + " " + (lfa.score(end)/lfa.maxScore(rq._2))  + " " + (lfa.scoreRaw(state)/lfa.maxScoreRaw)  + " " + (lfa.scoreRaw(end)/lfa.maxScoreRaw))
+            List(rq._1, rq._2, lfa.score(state)/lfa.maxScore(rq._2), lfa.score(end)/lfa.maxScore(rq._2), lfa.scoreRaw(state)/lfa.maxScoreRaw, lfa.scoreRaw(end)/lfa.maxScoreRaw)
         }
         
         exportList(values, "ratio-score")
